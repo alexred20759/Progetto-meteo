@@ -283,15 +283,25 @@ st.markdown(
 # RICERCA DELLE CITTÀ
 # ============================================================
 
+
+# ============================================================
+# RICERCA DELLE CITTÀ
+# ============================================================
+
+@st.cache_data(ttl=3600)
 def cerca_citta(nome_citta):
     """
     Cerca fino a cinque località tramite il servizio di geocodifica
     di Open-Meteo.
 
-    Restituisce una lista di risultati, oppure una lista vuota
+    La cache conserva i risultati per un'ora: se viene cercata
+    nuovamente la stessa città, evita una nuova richiesta HTTP.
+
+    Restituisce una lista di risultati oppure una lista vuota
     se non viene trovata alcuna corrispondenza.
     """
 
+    # Prepara i parametri della ricerca.
     parametri = {
         "name": nome_citta,
         "count": 5,
@@ -299,19 +309,22 @@ def cerca_citta(nome_citta):
         "format": "json",
     }
 
+    # Invia la richiesta al servizio di geocodifica.
     risposta = requests.get(
         GEOCODING_URL,
         params=parametri,
         timeout=TIMEOUT,
     )
 
-    # Verifica che la richiesta HTTP sia riuscita.
+    # Solleva un'eccezione se il server restituisce un errore HTTP.
     risposta.raise_for_status()
 
+    # Converte la risposta JSON in un dizionario Python.
     dati = risposta.json()
 
-    # Restituisce tutti i risultati trovati, fino a un massimo di cinque.
+    # Restituisce i risultati trovati.
     return dati.get("results", [])
+
 
 
 # ============================================================
