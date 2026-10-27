@@ -27,13 +27,29 @@
 # ============================================================
 # IMPORTAZIONE DELLE LIBRERIE
 # ============================================================
+import base64
+from pathlib import Path
 
+import requests
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 import requests
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 
+
+# ============================================================
+# PERCORSO DELL'IMMAGINE DI SFONDO
+# ============================================================
+
+# Individua la cartella in cui si trova dashboard.py.
+CARTELLA_PROGETTO = Path(__file__).resolve().parent
+
+# Percorso completo dell'immagine della Terra.
+PERCORSO_SFONDO = CARTELLA_PROGETTO / "sfondo_terra.png"
 # ============================================================
 # CONFIGURAZIONE DEL PROGRAMMA
 # ============================================================
@@ -70,7 +86,33 @@ COLORE_MASSIMA = "#FB7185"
 COLORE_MINIMA = "#60A5FA"
 COLORE_PIOGGIA = "#38BDF8"
 
+# ============================================================
+# CARICAMENTO DELL'IMMAGINE DI SFONDO
+# ============================================================
 
+# Converte l'immagine in Base64 per poterla utilizzare nel CSS.
+# Se il file non esiste, la dashboard utilizzerà lo sfondo blu.
+if PERCORSO_SFONDO.is_file():
+    with open(PERCORSO_SFONDO, "rb") as file:
+        SFONDO_BASE64 = base64.b64encode(file.read()).decode("utf-8")
+
+    SFONDO_CSS = (
+        "background: "
+        "linear-gradient(rgba(10, 27, 45, 0.70), rgba(10, 27, 45, 0.82)), "
+        f'url("data:image/png;base64,{SFONDO_BASE64}") '
+        "center / cover fixed no-repeat;"
+    )
+else:
+    SFONDO_CSS = (
+        "background: linear-gradient("
+        "135deg, #10243A 0%, #142D46 55%, #10243A 100%);"
+    )
+# ============================================================
+# CONTROLLO DEL CARICAMENTO DELLO SFONDO
+# ============================================================
+
+print("Percorso immagine:", PERCORSO_SFONDO)
+print("Immagine trovata:", PERCORSO_SFONDO.is_file())
 # ============================================================
 # CONFIGURAZIONE DELLA PAGINA
 # ============================================================
@@ -83,6 +125,7 @@ st.set_page_config(
 )
 
 
+
 # ============================================================
 # STILE CSS DELLA DASHBOARD
 # ============================================================
@@ -93,14 +136,9 @@ st.set_page_config(
 st.markdown(
     f"""
     <style>
-        /* Sfondo generale della pagina */
+        /* Sfondo generale: immagine della Terra con velo blu scuro */
         .stApp {{
-            background: linear-gradient(
-                135deg,
-                {BLU_NOTTE} 0%,
-                #142D46 55%,
-                #10243A 100%
-            );
+            {SFONDO_CSS}
             color: {BIANCO};
         }}
 
