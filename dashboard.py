@@ -79,7 +79,7 @@ st.set_page_config(
     page_title="Progetto Meteo",
     page_icon="🌦️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -241,6 +241,18 @@ st.markdown(
             color: {TESTO_SECONDARIO};
         }}
 
+        /* Pannello laterale per la ricerca delle località */
+        section[data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, #0B1B2D, #183650);
+            border-right: 1px solid #315875;
+        }}
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3 {{
+            color: {BIANCO} !important;
+        }}
+
         /* Adattamento agli schermi piccoli */
         @media (max-width: 768px) {{
             .titolo-dashboard {{
@@ -268,21 +280,21 @@ st.markdown(
 
 
 # ============================================================
-# RICERCA DELLA CITTÀ
+# RICERCA DELLE CITTÀ
 # ============================================================
 
 def cerca_citta(nome_citta):
     """
-    Cerca una città tramite il servizio di geocodifica
+    Cerca fino a cinque località tramite il servizio di geocodifica
     di Open-Meteo.
 
-    Restituisce le informazioni della prima città trovata.
-    Se non ci sono risultati, restituisce None.
+    Restituisce una lista di risultati, oppure una lista vuota
+    se non viene trovata alcuna corrispondenza.
     """
 
     parametri = {
         "name": nome_citta,
-        "count": 1,
+        "count": 5,
         "language": "it",
         "format": "json",
     }
@@ -298,13 +310,34 @@ def cerca_citta(nome_citta):
 
     dati = risposta.json()
 
-    # Controlla se è stata trovata almeno una città.
-    risultati = dati.get("results", [])
+    # Restituisce tutti i risultati trovati, fino a un massimo di cinque.
+    return dati.get("results", [])
 
-    if not risultati:
-        return None
 
-    return risultati[0]
+# ============================================================
+# DESCRIZIONE DELLE LOCALITÀ
+# ============================================================
+
+def descrivi_citta(citta):
+    """
+    Crea una descrizione leggibile della località da mostrare
+    nel menu di selezione.
+    """
+
+    nome = citta.get("name", "Località sconosciuta")
+    area = citta.get("admin1") or citta.get("admin2") or ""
+    paese = citta.get("country", "")
+
+    # Evita di ripetere il nome se l'area amministrativa coincide.
+    parti = [nome]
+
+    if area and area.lower() != nome.lower():
+        parti.append(area)
+
+    if paese:
+        parti.append(paese)
+
+    return " — ".join(parti)
 
 
 # ============================================================
@@ -605,369 +638,443 @@ def mostra_scheda(etichetta, valore, dettaglio, icona):
 
 
 # ============================================================
-# INTESTAZIONE DELLA DASHBOARD
+# MENU LATERALE E RICERCA DELLA LOCALITÀ
+# ============================================================
+
+# Inizializza lo stato della ricerca: Streamlit conserva questi dati
+# quando aggiorna la pagina dopo un'interazione dell'utente.
+if "risultati_citta" not in st.session_state:
+    st.session_state["risultati_citta"] = []
+
+if "citta_selezionata" not in st.session_state:
+    st.session_state["citta_selezionata"] = None
+
+if "carica_meteo" not in st.session_state:
+    st.session_state["carica_meteo"] = False
+
+with st.sidebar:
+    st.markdown("## 🌍 Cerca una località")
+    st.markdown(
+        '<p class="testo-secondario">Scrivi il nome e scegli il risultato '
+        'corretto in base alla regione e al Paese.</p>',
+        unsafe_allow_html=True,
+    )
+
+    # La ricerca viene eseguita soltanto premendo il pulsante.
+    nome_citta = st.text_input(
+        "Nome della città",
+        placeholder="Es. Torino, Roma, Milano...",
+        key="campo_nome_citta",
+    )
+
+    if st.button("🔎 Cerca località", type="primary", width="stretch"):
+        if not nome_citta.strip():
+            st.warning("Inserisci il nome di una città.")
+            st.session_state["risultati_citta"] = []
+        else:
+            try:
+                with st.spinner("Ricerca delle località..."):
+                    st.session_state["risultati_citta"] = cerca_citta(
+                        nome_citta.strip()
+                    )
+
+                if not st.session_state["risultati_citta"]:
+                    st.warning("Nessuna località trovata. Controlla il nome.")
+            except requests.exceptions.RequestException:
+                st.error(
+                    "Non è stato possibile contattare il servizio di geocodifica."
+                )
+
+    risultati_citta = st.session_state["risultati_citta"]
+
+    # Se ci sono risultati, permette di scegliere la località corretta.
+    if risultati_citta:
+        opzioni_citta = [
+            descrivi_citta(citta) for citta in risultati_citta
+        ]
+
+        indice_corrente = 0
+        citta_precedente = st.session_state.get("citta_selezionata")
+
+        # Mantiene la scelta precedente se è ancora tra i risultati.
+        if citta_precedente:
+            descrizione_precedente = descrivi_citta(citta_precedente)
+            if descrizione_precedente in opzioni_citta:
+                indice_corrente = opzioni_citta.index(descrizione_precedente)
+
+        indice_scelto = st.selectbox(
+            "Seleziona la località corretta",
+            options=range(len(risultati_citta)),
+            index=indice_corrente,
+            format_func=lambda indice: opzioni_citta[indice],
+            key="selettore_localita",
+        )
+
+        if st.button("🌦️ Mostra previsioni", width="stretch"):
+            st.session_state["citta_selezionata"] = risultati_citta[indice_scelto]
+            st.session_state["carica_meteo"] = True
+
+    st.divider()
+    st.caption("Dati meteorologici forniti da Open-Meteo.")
+
+
+# ============================================================
+# SCHERMATA INIZIALE
 # ============================================================
 
 st.markdown(
     """
     <div class="intestazione">
-        <div class="titolo-dashboard">
-            🌦️ Meteo Dashboard
-        </div>
+        <div class="titolo-dashboard">🌦️ Meteo Dashboard</div>
         <div class="sottotitolo-dashboard">
-            Condizioni attuali e previsioni meteorologiche
-            dei prossimi sette giorni.
+            Scopri le condizioni attuali e le previsioni dei prossimi sette giorni.
+            Cerca una località dal menu laterale e seleziona il risultato corretto.
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
+# Presenta le funzionalità prima che venga caricata una località.
+if not st.session_state["carica_meteo"]:
+    col_home1, col_home2, col_home3 = st.columns(3)
 
-# ============================================================
-# MODULO DI RICERCA
-# ============================================================
+    with col_home1:
+        mostra_scheda(
+            "Condizioni attuali",
+            "Temperatura e vento",
+            "Consulta i valori meteorologici della località scelta.",
+            "🌡️",
+        )
 
-with st.form("form_ricerca_citta"):
+    with col_home2:
+        mostra_scheda(
+            "Grafici interattivi",
+            "Ora per ora",
+            "Esplora l'andamento della temperatura e del vento.",
+            "📈",
+        )
 
-    colonna_ricerca, colonna_pulsante = st.columns(
-        [4, 1],
-        vertical_alignment="bottom",
+    with col_home3:
+        mostra_scheda(
+            "Previsioni settimanali",
+            "7 giorni",
+            "Confronta massime, minime e precipitazioni previste.",
+            "📅",
+        )
+
+    st.info(
+        "Per iniziare, cerca una città nel menu a sinistra, "
+        "seleziona la località corretta e premi «Mostra previsioni»."
     )
-
-    with colonna_ricerca:
-        nome_citta = st.text_input(
-            "📍 Cerca una città",
-            placeholder="Esempio: Taranto, Roma, Milano...",
-        )
-
-    with colonna_pulsante:
-        cerca = st.form_submit_button(
-            "Cerca meteo",
-            type="primary",
-            use_container_width=True,
-        )
 
 
 # ============================================================
 # ELABORAZIONE DELLA RICERCA
 # ============================================================
 
-if cerca:
+# Recupera il meteo soltanto dopo la conferma della località.
+if st.session_state["carica_meteo"]:
 
-    # Verifica che sia stato inserito un nome.
-    if not nome_citta.strip():
+    # Disattiva il comando per evitare richieste ripetute ai successivi rerun.
+    st.session_state["carica_meteo"] = False
 
-        st.warning("Inserisci il nome di una città.")
+    citta = st.session_state["citta_selezionata"]
 
+    if citta is None:
+        st.warning("Cerca e seleziona prima una località.")
     else:
-
         try:
+            # Usa le coordinate della località selezionata dall'utente.
+            latitudine = citta["latitude"]
+            longitudine = citta["longitude"]
+            nome_visualizzato = citta["name"]
+            paese = citta.get("country", "")
+            localita_completa = descrivi_citta(citta)
 
-            # Cerca la città e recupera le sue coordinate.
-            with st.spinner("🔎 Ricerca della città..."):
-                citta = cerca_citta(nome_citta.strip())
+            # Recupera i dati meteorologici.
+            with st.spinner("🌦️ Recupero delle previsioni..."):
+                dati = recupera_previsioni(
+                    latitudine,
+                    longitudine,
+                )
 
-            if citta is None:
+            # Controlla la presenza dei dati necessari.
+            if (
+                not dati.get("current")
+                or not dati.get("hourly")
+                or not dati.get("daily")
+            ):
 
                 st.error(
-                    "Nessuna città trovata. "
-                    "Controlla il nome e riprova."
+                    "Il servizio meteo non ha restituito "
+                    "tutti i dati necessari."
                 )
 
             else:
 
-                latitudine = citta["latitude"]
-                longitudine = citta["longitude"]
+                # Mostra il nome della località.
+                st.subheader(f"📍 {localita_completa}")
 
-                nome_visualizzato = citta["name"]
-                paese = citta.get("country", "")
+                st.caption(
+                    f"Coordinate geografiche: "
+                    f"{latitudine}, {longitudine}"
+                )
 
-                # Recupera i dati meteorologici.
-                with st.spinner("🌦️ Recupero delle previsioni..."):
-                    dati = recupera_previsioni(
-                        latitudine,
-                        longitudine,
+                # Recupera i dati meteorologici attuali.
+                dati_attuali = dati["current"]
+
+                temperatura_attuale = dati_attuali.get(
+                    "temperature_2m"
+                )
+
+                vento_attuale = dati_attuali.get(
+                    "wind_speed_10m"
+                )
+
+                # Recupera le previsioni giornaliere.
+                dati_giornalieri = dati["daily"]
+
+                temperature_massime = (
+                    dati_giornalieri["temperature_2m_max"]
+                )
+
+                temperature_minime = (
+                    dati_giornalieri["temperature_2m_min"]
+                )
+
+                precipitazioni = (
+                    dati_giornalieri["precipitation_sum"]
+                )
+
+                # Ricava il massimo e il minimo del primo giorno.
+                massima_oggi = (
+                    temperature_massime[0]
+                    if temperature_massime
+                    else None
+                )
+
+                minima_oggi = (
+                    temperature_minime[0]
+                    if temperature_minime
+                    else None
+                )
+
+                pioggia_oggi = (
+                    precipitazioni[0]
+                    if precipitazioni
+                    else None
+                )
+
+                st.divider()
+
+                # ====================================================
+                # SCHEDE DELLE CONDIZIONI METEO
+                # ====================================================
+
+                st.subheader("📊 Situazione meteorologica")
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    mostra_scheda(
+                        "Temperatura attuale",
+                        (
+                            f"{temperatura_attuale:.1f} °C"
+                            if temperatura_attuale is not None
+                            else "N/D"
+                        ),
+                        "Temperatura dell'aria",
+                        "🌡️",
                     )
 
-                # Controlla la presenza dei dati necessari.
-                if (
-                    not dati.get("current")
-                    or not dati.get("hourly")
-                    or not dati.get("daily")
-                ):
-
-                    st.error(
-                        "Il servizio meteo non ha restituito "
-                        "tutti i dati necessari."
+                with col2:
+                    mostra_scheda(
+                        "Vento attuale",
+                        (
+                            f"{vento_attuale:.1f} km/h"
+                            if vento_attuale is not None
+                            else "N/D"
+                        ),
+                        "Velocità del vento",
+                        "💨",
                     )
 
-                else:
-
-                    # Mostra il nome della località.
-                    st.subheader(
-                        f"📍 {nome_visualizzato}, {paese}"
+                with col3:
+                    mostra_scheda(
+                        "Massima prevista",
+                        (
+                            f"{massima_oggi:.1f} °C"
+                            if massima_oggi is not None
+                            else "N/D"
+                        ),
+                        "Massima del primo giorno",
+                        "☀️",
                     )
 
+                with col4:
+                    mostra_scheda(
+                        "Minima prevista",
+                        (
+                            f"{minima_oggi:.1f} °C"
+                            if minima_oggi is not None
+                            else "N/D"
+                        ),
+                        "Minima del primo giorno",
+                        "🌙",
+                    )
+
+                # Mostra le precipitazioni previste per il giorno.
+                if pioggia_oggi is not None:
                     st.caption(
-                        f"Coordinate geografiche: "
-                        f"{latitudine}, {longitudine}"
+                        "🌧️ Precipitazioni previste per il primo "
+                        f"giorno: {pioggia_oggi:.1f} mm."
                     )
 
-                    # Recupera i dati meteorologici attuali.
-                    dati_attuali = dati["current"]
+                st.divider()
 
-                    temperatura_attuale = dati_attuali.get(
-                        "temperature_2m"
-                    )
+                # ====================================================
+                # PREVISIONI ORARIE
+                # ====================================================
 
-                    vento_attuale = dati_attuali.get(
-                        "wind_speed_10m"
-                    )
+                dati_orari = dati["hourly"]
 
-                    # Recupera le previsioni giornaliere.
-                    dati_giornalieri = dati["daily"]
+                tabella_oraria = pd.DataFrame({
+                    "Data e ora": pd.to_datetime(
+                        dati_orari["time"]
+                    ),
+                    "Temperatura (°C)": (
+                        dati_orari["temperature_2m"]
+                    ),
+                    "Vento (km/h)": (
+                        dati_orari["wind_speed_10m"]
+                    ),
+                })
 
-                    temperature_massime = (
-                        dati_giornalieri["temperature_2m_max"]
-                    )
+                # Grafico della temperatura oraria.
+                st.subheader("🌡️ Andamento della temperatura")
 
-                    temperature_minime = (
-                        dati_giornalieri["temperature_2m_min"]
-                    )
+                grafico_temperatura = crea_grafico_linea(
+                    date=tabella_oraria["Data e ora"],
+                    valori=tabella_oraria[
+                        "Temperatura (°C)"
+                    ],
+                    titolo="Previsioni orarie della temperatura",
+                    nome_serie="Temperatura",
+                    colore=COLORE_TEMPERATURA,
+                    nome_asse_y="Temperatura (°C)",
+                )
 
-                    precipitazioni = (
-                        dati_giornalieri["precipitation_sum"]
-                    )
+                st.plotly_chart(
+                    grafico_temperatura,
+                    width="stretch",
+                    key="grafico_temperatura",
+                )
 
-                    # Ricava il massimo e il minimo del primo giorno.
-                    massima_oggi = (
-                        temperature_massime[0]
-                        if temperature_massime
-                        else None
-                    )
+                # Grafico del vento orario.
+                st.subheader("💨 Andamento del vento")
 
-                    minima_oggi = (
-                        temperature_minime[0]
-                        if temperature_minime
-                        else None
-                    )
+                grafico_vento = crea_grafico_linea(
+                    date=tabella_oraria["Data e ora"],
+                    valori=tabella_oraria["Vento (km/h)"],
+                    titolo="Previsioni orarie del vento",
+                    nome_serie="Velocità del vento",
+                    colore=COLORE_VENTO,
+                    nome_asse_y="Velocità (km/h)",
+                )
 
-                    pioggia_oggi = (
-                        precipitazioni[0]
-                        if precipitazioni
-                        else None
-                    )
+                st.plotly_chart(
+                    grafico_vento,
+                    width="stretch",
+                    key="grafico_vento",
+                )
 
-                    st.divider()
+                st.divider()
 
-                    # ====================================================
-                    # SCHEDE DELLE CONDIZIONI METEO
-                    # ====================================================
+                # ====================================================
+                # PREVISIONI GIORNALIERE
+                # ====================================================
 
-                    st.subheader("📊 Situazione meteorologica")
+                tabella_giornaliera = pd.DataFrame({
+                    "Data": pd.to_datetime(
+                        dati_giornalieri["time"]
+                    ).date,
+                    "Temperatura massima (°C)": (
+                        temperature_massime
+                    ),
+                    "Temperatura minima (°C)": (
+                        temperature_minime
+                    ),
+                    "Precipitazioni (mm)": precipitazioni,
+                })
 
-                    col1, col2, col3, col4 = st.columns(4)
+                # Grafico delle temperature giornaliere.
+                st.subheader(
+                    "📅 Temperature massime e minime giornaliere"
+                )
 
-                    with col1:
-                        mostra_scheda(
-                            "Temperatura attuale",
-                            (
-                                f"{temperatura_attuale:.1f} °C"
-                                if temperatura_attuale is not None
-                                else "N/D"
-                            ),
-                            "Temperatura dell'aria",
-                            "🌡️",
-                        )
-
-                    with col2:
-                        mostra_scheda(
-                            "Vento attuale",
-                            (
-                                f"{vento_attuale:.1f} km/h"
-                                if vento_attuale is not None
-                                else "N/D"
-                            ),
-                            "Velocità del vento",
-                            "💨",
-                        )
-
-                    with col3:
-                        mostra_scheda(
-                            "Massima prevista",
-                            (
-                                f"{massima_oggi:.1f} °C"
-                                if massima_oggi is not None
-                                else "N/D"
-                            ),
-                            "Massima del primo giorno",
-                            "☀️",
-                        )
-
-                    with col4:
-                        mostra_scheda(
-                            "Minima prevista",
-                            (
-                                f"{minima_oggi:.1f} °C"
-                                if minima_oggi is not None
-                                else "N/D"
-                            ),
-                            "Minima del primo giorno",
-                            "🌙",
-                        )
-
-                    # Mostra le precipitazioni previste per il giorno.
-                    if pioggia_oggi is not None:
-                        st.caption(
-                            "🌧️ Precipitazioni previste per il primo "
-                            f"giorno: {pioggia_oggi:.1f} mm."
-                        )
-
-                    st.divider()
-
-                    # ====================================================
-                    # PREVISIONI ORARIE
-                    # ====================================================
-
-                    dati_orari = dati["hourly"]
-
-                    tabella_oraria = pd.DataFrame({
-                        "Data e ora": pd.to_datetime(
-                            dati_orari["time"]
-                        ),
-                        "Temperatura (°C)": (
-                            dati_orari["temperature_2m"]
-                        ),
-                        "Vento (km/h)": (
-                            dati_orari["wind_speed_10m"]
-                        ),
-                    })
-
-                    # Grafico della temperatura oraria.
-                    st.subheader("🌡️ Andamento della temperatura")
-
-                    grafico_temperatura = crea_grafico_linea(
-                        date=tabella_oraria["Data e ora"],
-                        valori=tabella_oraria[
-                            "Temperatura (°C)"
-                        ],
-                        titolo="Previsioni orarie della temperatura",
-                        nome_serie="Temperatura",
-                        colore=COLORE_TEMPERATURA,
-                        nome_asse_y="Temperatura (°C)",
-                    )
-
-                    st.plotly_chart(
-                        grafico_temperatura,
-                        use_container_width=True,
-                        key="grafico_temperatura",
-                    )
-
-                    # Grafico del vento orario.
-                    st.subheader("💨 Andamento del vento")
-
-                    grafico_vento = crea_grafico_linea(
-                        date=tabella_oraria["Data e ora"],
-                        valori=tabella_oraria["Vento (km/h)"],
-                        titolo="Previsioni orarie del vento",
-                        nome_serie="Velocità del vento",
-                        colore=COLORE_VENTO,
-                        nome_asse_y="Velocità (km/h)",
-                    )
-
-                    st.plotly_chart(
-                        grafico_vento,
-                        use_container_width=True,
-                        key="grafico_vento",
-                    )
-
-                    st.divider()
-
-                    # ====================================================
-                    # PREVISIONI GIORNALIERE
-                    # ====================================================
-
-                    tabella_giornaliera = pd.DataFrame({
-                        "Data": pd.to_datetime(
-                            dati_giornalieri["time"]
-                        ).date,
-                        "Temperatura massima (°C)": (
-                            temperature_massime
-                        ),
-                        "Temperatura minima (°C)": (
-                            temperature_minime
-                        ),
-                        "Precipitazioni (mm)": precipitazioni,
-                    })
-
-                    # Grafico delle temperature giornaliere.
-                    st.subheader(
-                        "📅 Temperature massime e minime giornaliere"
-                    )
-
-                    grafico_temperature = (
-                        crea_grafico_temperature_giornaliere(
-                            date=tabella_giornaliera["Data"],
-                            temperature_massime=(
-                                tabella_giornaliera[
-                                    "Temperatura massima (°C)"
-                                ]
-                            ),
-                            temperature_minime=(
-                                tabella_giornaliera[
-                                    "Temperatura minima (°C)"
-                                ]
-                            ),
-                        )
-                    )
-
-                    st.plotly_chart(
-                        grafico_temperature,
-                        use_container_width=True,
-                        key="grafico_temperature_giornaliere",
-                    )
-
-                    # Grafico delle precipitazioni giornaliere.
-                    st.subheader("🌧️ Precipitazioni giornaliere")
-
-                    grafico_pioggia = crea_grafico_precipitazioni(
+                grafico_temperature = (
+                    crea_grafico_temperature_giornaliere(
                         date=tabella_giornaliera["Data"],
-                        precipitazioni=(
+                        temperature_massime=(
                             tabella_giornaliera[
-                                "Precipitazioni (mm)"
+                                "Temperatura massima (°C)"
+                            ]
+                        ),
+                        temperature_minime=(
+                            tabella_giornaliera[
+                                "Temperatura minima (°C)"
                             ]
                         ),
                     )
+                )
 
-                    st.plotly_chart(
-                        grafico_pioggia,
-                        use_container_width=True,
-                        key="grafico_precipitazioni",
-                    )
+                st.plotly_chart(
+                    grafico_temperature,
+                    width="stretch",
+                    key="grafico_temperature_giornaliere",
+                )
 
-                    # ====================================================
-                    # TABELLA RIEPILOGATIVA
-                    # ====================================================
+                # Grafico delle precipitazioni giornaliere.
+                st.subheader("🌧️ Precipitazioni giornaliere")
 
-                    st.subheader("📋 Riepilogo dei sette giorni")
+                grafico_pioggia = crea_grafico_precipitazioni(
+                    date=tabella_giornaliera["Data"],
+                    precipitazioni=(
+                        tabella_giornaliera[
+                            "Precipitazioni (mm)"
+                        ]
+                    ),
+                )
 
-                    st.dataframe(
-                        tabella_giornaliera,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                st.plotly_chart(
+                    grafico_pioggia,
+                    width="stretch",
+                    key="grafico_precipitazioni",
+                )
 
-                    # Informazioni sul servizio utilizzato.
-                    st.divider()
+                # ====================================================
+                # TABELLA RIEPILOGATIVA
+                # ====================================================
 
-                    st.caption(
-                        "🌐 Dati meteorologici forniti da Open-Meteo. "
-                        "Le previsioni possono essere aggiornate "
-                        "dal servizio nel corso della giornata."
-                    )
+                st.subheader("📋 Riepilogo dei sette giorni")
 
-        # ============================================================
+                st.dataframe(
+                    tabella_giornaliera,
+                    width="stretch",
+                    hide_index=True,
+                )
+
+                # Informazioni sul servizio utilizzato.
+                st.divider()
+
+                st.caption(
+                    "🌐 Dati meteorologici forniti da Open-Meteo. "
+                    "Le previsioni possono essere aggiornate "
+                    "dal servizio nel corso della giornata."
+                )
+
+    # ============================================================
         # GESTIONE DEGLI ERRORI
         # ============================================================
 
