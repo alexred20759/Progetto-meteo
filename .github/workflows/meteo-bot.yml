@@ -7,19 +7,24 @@
 #
 # Operazioni:
 # 1. Apre l'applicazione Streamlit.
-# 2. Inserisce il nome di una città.
-# 3. Cerca le località disponibili.
-# 4. Seleziona casualmente una località.
-# 5. Conferma la selezione.
-# 6. Mostra le previsioni meteorologiche.
-# 7. Verifica il caricamento dei dati.
+# 2. Individua dinamicamente il frame Meteo.
+# 3. Inserisce il nome di una città.
+# 4. Cerca le località disponibili.
+# 5. Seleziona casualmente una località.
+# 6. Conferma la selezione.
+# 7. Mostra le previsioni meteorologiche.
+# 8. Verifica il caricamento dei dati.
 #
-# Avvio: manuale da GitHub Actions.
+# Avvio: manuale oppure richiamato da Keep Alive.
 # ============================================================
 
 name: Meteo Bot
 
 on:
+  # Permette a Keep Alive di richiamare questo workflow.
+  workflow_call:
+
+  # Permette l'avvio manuale da GitHub Actions.
   workflow_dispatch:
 
 # Permessi minimi necessari.
@@ -33,6 +38,7 @@ jobs:
     name: Simulazione utente Meteo
 
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
 
@@ -44,27 +50,29 @@ jobs:
         uses: actions/checkout@v4
 
       # --------------------------------------------------------
-      # 2. Configura Node.js
+      # 2. Configura Python
       # --------------------------------------------------------
 
-      - name: Configura Node.js
-        uses: actions/setup-node@v4
+      - name: Configura Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 22
+          python-version: '3.11'
 
       # --------------------------------------------------------
-      # 3. Installa Playwright
+      # 3. Installa Playwright per Python
       # --------------------------------------------------------
 
       - name: Installa Playwright
-        run: npm install playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
 
       # --------------------------------------------------------
       # 4. Installa Chromium
       # --------------------------------------------------------
 
       - name: Installa Chromium
-        run: npx playwright install --with-deps chromium
+        run: python -m playwright install --with-deps chromium
 
       # --------------------------------------------------------
       # 5. Avvia il bot
@@ -72,209 +80,473 @@ jobs:
 
       - name: Esegui il bot Meteo
         run: |
-          node <<'NODE'
+          python - <<'PY'
 
-          const { chromium } = require('playwright');
+          import random
+          import re
+          import sys
+          import time
 
-          // Indirizzo pubblico dell'applicazione.
-          const URL_APP =
-            'https://progetto-meteo-gvm3zvz4cadns7gxmvm9hc.streamlit.app/';
+          from playwright.sync_api import sync_playwright
 
-          async function main() {
 
-            let browser;
+          # Indirizzo pubblico dell'applicazione.
+          URL_APP = (
+              "https://progetto-meteo-gvm3zvz4cadns7gxmvm9hc.streamlit.app/"
+          )
 
-            try {
 
-              console.log('Apro l’applicazione Meteo...');
+          # ====================================================
+          # FUNZIONE PRINCIPALE
+          # ====================================================
 
-              // Avvia Chromium in modalità senza interfaccia grafica.
-              browser = await chromium.launch({
-                headless: true
-              });
+          def main():
 
-              const page = await browser.newPage();
+              browser = None
+              page = None
 
-              // Imposta un timeout generale.
-              page.setDefaultTimeout(30000);
+              try:
 
-              // Apre la dashboard.
-              await page.goto(URL_APP, {
-                waitUntil: 'domcontentloaded',
-                timeout: 90000
-              });
+                  print("Apro l'applicazione Meteo...")
 
-              console.log('Pagina aperta.');
+                  # Avvia Chromium senza interfaccia grafica.
+                  playwright = sync_playwright().start()
 
-              // ------------------------------------------------
-              // 1. Controlla l'eventuale schermata di sospensione
-              // ------------------------------------------------
+                  browser = playwright.chromium.launch(
+                      headless=True
+                  )
 
-              const pulsanteRiattivazione = page.getByRole(
-                'button',
-                { name: /get this app back up/i }
-              );
+                  # Crea una nuova pagina.
+                  page = browser.new_page()
 
-              if (await pulsanteRiattivazione.count() > 0) {
+                  # Apre la dashboard.
+                  page.goto(
+                      URL_APP,
+                      wait_until="domcontentloaded",
+                      timeout=90000
+                  )
 
-                console.log('App sospesa: provo a riattivarla.');
+                  print("Pagina aperta.")
 
-                await pulsanteRiattivazione.first().click();
+                  # Attende il primo caricamento di Streamlit.
+                  page.wait_for_timeout(15000)
 
-                // Attende che Streamlit completi il riavvio.
-                await page.waitForTimeout(20000);
 
-              }
+                  # ------------------------------------------------
+                  # 1. Ricerca dinamica del frame Meteo
+                  # ------------------------------------------------
 
-              // ------------------------------------------------
-              // 2. Attende il campo della città
-              // ------------------------------------------------
+                  print("\nRICERCA DEL FRAME METEO...")
 
-              const campoCitta = page.getByLabel(
-                'Nome della città'
-              );
+                  frame_meteo = None
+                  campo_citta = None
 
-              await campoCitta.waitFor({
-                state: 'visible',
-                timeout: 90000
-              });
+                  # Tempo massimo di ricerca: 60 secondi.
+                  tempo_inizio = time.monotonic()
 
-              console.log('Campo città individuato.');
+                  while time.monotonic() - tempo_inizio < 60:
 
-              // Inserisce Roma come testo di ricerca.
-              await campoCitta.fill('Roma');
+                      # Esamina tutti i frame presenti nella pagina.
+                      for frame in page.frames:
 
-              // ------------------------------------------------
-              // 3. Avvia la ricerca delle località
-              // ------------------------------------------------
+                          try:
 
-              const pulsanteRicerca = page.getByRole(
-                'button',
-                { name: /Cerca località/ }
-              );
+                              # Cerca il campo città nel frame.
+                              campo = frame.get_by_label(
+                                  "Nome della città"
+                              )
 
-              await pulsanteRicerca.click();
+                              # Verifica se il campo esiste ed è visibile.
+                              if (
+                                  campo.count() > 0
+                                  and campo.is_visible()
+                              ):
 
-              console.log('Ricerca delle località avviata.');
+                                  frame_meteo = frame
+                                  campo_citta = campo
 
-              // Attende il menu a tendina.
-              const selettoreLocalita = page.getByRole(
-                'combobox',
-                { name: 'Seleziona la località' }
-              );
+                                  break
 
-              await selettoreLocalita.waitFor({
-                state: 'visible',
-                timeout: 60000
-              });
+                          except Exception:
 
-              // ------------------------------------------------
-              // 4. Apre il menu e raccoglie le località
-              // ------------------------------------------------
+                              # Il frame potrebbe essere aggiornato
+                              # durante il caricamento di Streamlit.
+                              continue
 
-              await selettoreLocalita.click();
+                      if campo_citta is not None:
+                          break
 
-              const opzioni = page.getByRole('option');
+                      # Riprova dopo un secondo.
+                      page.wait_for_timeout(1000)
 
-              await opzioni.first().waitFor({
-                state: 'visible',
-                timeout: 15000
-              });
+                  if frame_meteo is None:
 
-              const numeroOpzioni = await opzioni.count();
+                      raise RuntimeError(
+                          "Campo Nome della città non trovato "
+                          "entro 60 secondi."
+                      )
 
-              if (numeroOpzioni === 0) {
-                throw new Error(
-                  'Nessuna località disponibile nel menu.'
-                );
-              }
+                  print("\nFRAME METEO INDIVIDUATO!")
+                  print("URL FRAME:", frame_meteo.url)
 
-              console.log(
-                `Località disponibili: ${numeroOpzioni}`
-              );
 
-              // ------------------------------------------------
-              // 5. Sceglie casualmente una località
-              // ------------------------------------------------
+                  # ------------------------------------------------
+                  # 2. Inserimento del nome della città
+                  # ------------------------------------------------
 
-              const indiceCasuale = Math.floor(
-                Math.random() * numeroOpzioni
-              );
+                  print("\nINSERIMENTO DELLA CITTÀ...")
 
-              const opzioneScelta = opzioni.nth(
-                indiceCasuale
-              );
+                  campo_citta.fill("Roma")
 
-              const nomeLocalita = (
-                await opzioneScelta.innerText()
-              ).trim();
+                  print("Città inserita: Roma")
 
-              console.log(
-                `Località scelta: ${nomeLocalita}`
-              );
 
-              await opzioneScelta.click();
+                  # ------------------------------------------------
+                  # 3. Ricerca delle località
+                  # ------------------------------------------------
 
-              // ------------------------------------------------
-              // 6. Conferma e mostra le previsioni
-              // ------------------------------------------------
+                  print("\nRICERCA DELLE LOCALITÀ...")
 
-              const pulsantePrevisioni = page.getByRole(
-                'button',
-                { name: /Mostra previsioni/ }
-              );
+                  pulsante_cerca = frame_meteo.get_by_role(
+                      "button",
+                      name=re.compile(
+                          "Cerca località",
+                          re.IGNORECASE
+                      )
+                  )
 
-              await pulsantePrevisioni.waitFor({
-                state: 'visible',
-                timeout: 15000
-              });
+                  pulsante_cerca.click()
 
-              await pulsantePrevisioni.click();
+                  print("Pulsante Cerca località cliccato.")
 
-              console.log('Richiesta delle previsioni inviata.');
+                  # Attende l'aggiornamento di Streamlit.
+                  page.wait_for_timeout(3000)
 
-              // ------------------------------------------------
-              // 7. Verifica il caricamento dei dati meteorologici
-              // ------------------------------------------------
 
-              const intestazioneMeteo = page.getByRole(
-                'heading',
-                { name: /Situazione meteorologica attuale/ }
-              );
+                  # ------------------------------------------------
+                  # 4. Individuazione del menu a tendina
+                  # ------------------------------------------------
 
-              await intestazioneMeteo.waitFor({
-                state: 'visible',
-                timeout: 90000
-              });
+                  print("\nRICERCA DEL MENU A TENDINA...")
 
-              console.log('Previsioni meteorologiche caricate.');
+                  selettore_localita = frame_meteo.get_by_role(
+                      "combobox",
+                      name="Seleziona la località"
+                  )
 
-              console.log(
-                `TEST COMPLETATO: ${nomeLocalita}`
-              );
+                  selettore_localita.wait_for(
+                      state="visible",
+                      timeout=60000
+                  )
 
-            } catch (errore) {
+                  print("Menu delle località individuato!")
 
-              console.error(
-                'Errore durante il controllo:',
-                errore
-              );
 
-              throw errore;
+                  # ------------------------------------------------
+                  # 5. Apertura del menu
+                  # ------------------------------------------------
 
-            } finally {
+                  print("\nAPERTURA DEL MENU...")
 
-              if (browser) {
-                await browser.close();
-              }
+                  selettore_localita.click()
 
-            }
+                  page.wait_for_timeout(1000)
 
-          }
 
-          main().catch((errore) => {
-            console.error('Esecuzione del bot fallita:', errore);
-            process.exitCode = 1;
-          });
+                  # ------------------------------------------------
+                  # 6. Lettura delle località disponibili
+                  # ------------------------------------------------
 
-          NODE
+                  print("\nLOCALITÀ DISPONIBILI:")
+
+                  opzioni = frame_meteo.get_by_role("option")
+
+                  numero_opzioni = opzioni.count()
+
+                  print("Numero di opzioni:", numero_opzioni)
+
+                  if numero_opzioni == 0:
+
+                      raise RuntimeError(
+                          "Nessuna località disponibile nel menu."
+                      )
+
+                  # Legge tutte le località e i relativi testi.
+                  localita_disponibili = []
+
+                  for indice in range(numero_opzioni):
+
+                      testo = opzioni.nth(indice).inner_text().strip()
+
+                      localita_disponibili.append(testo)
+
+                      print(f"{indice + 1}. {testo}")
+
+
+                  # ------------------------------------------------
+                  # 7. Selezione casuale della località
+                  # ------------------------------------------------
+
+                  print("\nSELEZIONE DELLA LOCALITÀ...")
+
+                  # Sceglie casualmente un indice tra quelli disponibili.
+                  indice_scelto = random.randrange(numero_opzioni)
+
+                  localita_scelta = localita_disponibili[indice_scelto]
+
+                  print("Località scelta:", localita_scelta)
+
+                  # Clicca sull'opzione scelta.
+                  opzioni.nth(indice_scelto).click()
+
+                  print("Località selezionata.")
+
+                  # Attende che Streamlit aggiorni la selezione.
+                  page.wait_for_timeout(2000)
+
+
+                  # ------------------------------------------------
+                  # 8. Ricerca del pulsante Mostra previsioni
+                  # ------------------------------------------------
+
+                  print(
+                      "\nRICERCA DEL PULSANTE MOSTRA PREVISIONI..."
+                  )
+
+                  pulsante_previsioni = frame_meteo.get_by_role(
+                      "button",
+                      name=re.compile(
+                          "Mostra previsioni",
+                          re.IGNORECASE
+                      )
+                  )
+
+                  pulsante_previsioni.wait_for(
+                      state="visible",
+                      timeout=60000
+                  )
+
+                  print(
+                      "Pulsante Mostra previsioni individuato!"
+                  )
+
+                  # Verifica che il pulsante sia abilitato.
+                  if not pulsante_previsioni.is_enabled():
+
+                      raise RuntimeError(
+                          "Il pulsante Mostra previsioni non è abilitato."
+                      )
+
+
+                  # ------------------------------------------------
+                  # 9. Avvio delle previsioni
+                  # ------------------------------------------------
+
+                  print("\nAVVIO DELLE PREVISIONI...")
+
+                  # Memorizza il testo presente prima del clic.
+                  testo_precedente = frame_meteo.locator(
+                      "body"
+                  ).inner_text()
+
+                  # Clicca sul pulsante.
+                  pulsante_previsioni.click()
+
+                  print(
+                      "Pulsante Mostra previsioni cliccato."
+                  )
+
+                  print(
+                      "\nATTENDO IL CARICAMENTO DEI RISULTATI..."
+                  )
+
+
+                  # ------------------------------------------------
+                  # 10. Attesa dei risultati
+                  # ------------------------------------------------
+
+                  tempo_inizio_risultati = time.monotonic()
+
+                  testo_corrente = ""
+                  secondi_stabile = 0
+                  risultato_caricato = False
+
+                  # Tempo massimo di attesa: 90 secondi.
+                  while time.monotonic() - tempo_inizio_risultati < 90:
+
+                      try:
+
+                          # Legge il contenuto aggiornato della dashboard.
+                          testo_corrente = frame_meteo.locator(
+                              "body"
+                          ).inner_text()
+
+                          # Controlla se Streamlit sta ancora elaborando.
+                          spinner = frame_meteo.locator(
+                              '[data-testid="stSpinner"]'
+                          )
+
+                          caricamento_in_corso = (
+                              spinner.count() > 0
+                              and spinner.first.is_visible()
+                          )
+
+                          # Verifica che il contenuto sia cambiato
+                          # e che non ci siano più indicatori di caricamento.
+                          if (
+                              testo_corrente != testo_precedente
+                              and not caricamento_in_corso
+                              and "Running..." not in testo_corrente
+                          ):
+
+                              secondi_stabile += 1
+
+                          else:
+
+                              secondi_stabile = 0
+
+                          # Il contenuto deve superare tre controlli
+                          # consecutivi senza indicatori di caricamento.
+                          if secondi_stabile >= 3:
+
+                              risultato_caricato = True
+                              break
+
+                      except Exception:
+
+                          # Streamlit potrebbe aggiornare il frame
+                          # mentre leggiamo il contenuto.
+                          secondi_stabile = 0
+
+                      # Controllo ogni secondo.
+                      page.wait_for_timeout(1000)
+
+
+                  # ------------------------------------------------
+                  # 11. Verifica finale
+                  # ------------------------------------------------
+
+                  if risultato_caricato:
+
+                      print("\nPREVISIONI CARICATE!")
+
+                      print("\nCONTENUTO VISIBILE:")
+
+                      print(testo_corrente[-3000:])
+
+                  else:
+
+                      print(
+                          "\nATTENZIONE: RISULTATI NON VERIFICATI."
+                      )
+
+                      print(
+                          "Il tempo massimo di attesa è stato raggiunto."
+                      )
+
+                      print("\nCONTENUTO ATTUALE:")
+
+                      print(testo_corrente[-3000:])
+
+                      raise RuntimeError(
+                          "Le previsioni non sono state verificate."
+                      )
+
+
+                  # ------------------------------------------------
+                  # 12. Screenshot finale
+                  # ------------------------------------------------
+
+                  page.screenshot(
+                      path="diagnostica_meteo.png",
+                      full_page=True
+                  )
+
+                  print("\nScreenshot finale salvato.")
+
+                  print("\nTEST COMPLETATO CON SUCCESSO!")
+
+                  # Mantiene aperto il browser per altri 10 secondi.
+                  page.wait_for_timeout(10000)
+
+              except Exception as errore:
+
+                  print(
+                      "\nERRORE DURANTE IL CONTROLLO:",
+                      errore
+                  )
+
+                  # Prova a salvare uno screenshot diagnostico.
+                  if page is not None and not page.is_closed():
+
+                      try:
+
+                          page.screenshot(
+                              path="diagnostica_meteo.png",
+                              full_page=True
+                          )
+
+                          print(
+                              "Screenshot diagnostico salvato."
+                          )
+
+                      except Exception as errore_screenshot:
+
+                          print(
+                              "Impossibile salvare lo screenshot:",
+                              errore_screenshot
+                          )
+
+                  raise
+
+              finally:
+
+                  # Chiude il browser soltanto alla fine del test.
+                  if browser is not None:
+
+                      browser.close()
+
+                      print("\nBrowser chiuso.")
+
+                  if "playwright" in locals():
+
+                      playwright.stop()
+
+
+          # ====================================================
+          # AVVIO DEL BOT
+          # ====================================================
+
+          if __name__ == "__main__":
+
+              try:
+
+                  # Mantiene la codifica UTF-8 per i messaggi.
+                  if hasattr(sys.stdout, "reconfigure"):
+                      sys.stdout.reconfigure(encoding="utf-8")
+
+                  main()
+
+              except Exception as errore:
+
+                  print(
+                      "\nESECUZIONE DEL BOT FALLITA:",
+                      errore
+                  )
+
+                  sys.exit(1)
+
+          PY
+
+      # --------------------------------------------------------
+      # 6. Salva lo screenshot del test
+      # --------------------------------------------------------
+
+      - name: Salva screenshot del test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risultato-test-meteo
+          path: diagnostica_meteo.png
+          if-no-files-found: ignore
+          retention-days: 7

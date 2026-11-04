@@ -5,6 +5,8 @@
 #
 # Controlla periodicamente l'applicazione Streamlit.
 # Se compare la schermata di sospensione, prova a riattivarla.
+#
+# Dopo il controllo avvia il Meteo Bot.
 # ============================================================
 
 name: Streamlit Keep Alive
@@ -22,111 +24,194 @@ permissions:
   contents: read
 
 jobs:
+
+  # ==========================================================
+  # JOB 1 - CONTROLLO E RIATTIVAZIONE STREAMLIT
+  # ==========================================================
+
   keep-alive:
     name: Controllo applicazione Meteo
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
+
       # --------------------------------------------------------
-      # 1. Preparazione ambiente Node.js
+      # 1. Preparazione ambiente Python
       # --------------------------------------------------------
-      - name: Configura Node.js
-        uses: actions/setup-node@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 22
+          python-version: "3.11"
 
       # --------------------------------------------------------
       # 2. Installazione Playwright
       # --------------------------------------------------------
+
       - name: Installa Playwright
-        run: npm install --no-save playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
 
       # --------------------------------------------------------
       # 3. Installazione browser Chromium
       # --------------------------------------------------------
+
       - name: Installa Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          python -m playwright install --with-deps chromium
 
       # --------------------------------------------------------
       # 4. Apertura e controllo applicazione Streamlit
       # --------------------------------------------------------
+
       - name: Controlla e riattiva applicazione
         run: |
-          node <<'NODE'
-          const { chromium } = require('playwright');
+          python - <<'PY'
+          import re
+          import sys
 
-          const URL_APP = 'https://progetto-meteo-gvm3zvz4cadns7gxmvm9hc.streamlit.app/';
+          from playwright.sync_api import sync_playwright
 
-          async function main() {
-            const browser = await chromium.launch({
-              headless: true
-            });
+          sys.stdout.reconfigure(encoding="utf-8")
 
-            try {
-              const page = await browser.newPage();
+          URL_APP = (
+              "https://progetto-meteo-gvm3zvz4cadns7gxmvm9hc.streamlit.app/"
+          )
 
-              console.log('Apro l applicazione Meteo...');
+          def main():
 
-              await page.goto(URL_APP, {
-                waitUntil: 'domcontentloaded',
-                timeout: 90000
-              });
+              with sync_playwright() as playwright:
 
-              await page.waitForTimeout(10000);
+                  browser = playwright.chromium.launch(
+                      headless=True
+                  )
 
-              // Controlla se Streamlit mostra la schermata di sospensione.
-              const testoPagina = await page.locator('body').innerText();
+                  try:
 
-              if (/get this app back up/i.test(testoPagina)) {
-                console.log('Applicazione sospesa. Provo a riattivarla...');
+                      page = browser.new_page()
 
-                const pulsante = page.getByRole('button', {
-                  name: /yes,\s*get this app back up/i
-                });
+                      page.set_default_timeout(30000)
 
-                if (await pulsante.count() > 0) {
-                  await pulsante.first().click();
+                      print("Apro l'applicazione Meteo...")
 
-                  console.log('Richiesta di riattivazione inviata.');
+                      page.goto(
+                          URL_APP,
+                          wait_until="domcontentloaded",
+                          timeout=90000
+                      )
 
-                  // Attende il caricamento dell'applicazione.
-                  await page.waitForTimeout(60000);
-                } else {
-                  throw new Error(
-                    'Schermata di sospensione rilevata, ma pulsante non trovato.'
-                  );
-                }
-              } else {
-                console.log('Nessuna schermata di sospensione rilevata.');
-              }
+                      # Attende il caricamento iniziale.
+                      page.wait_for_timeout(10000)
 
-              // Rilegge il contenuto della pagina dopo l'eventuale riattivazione.
-                const testoFinale = await page.locator('body').innerText();
+                      # ------------------------------------------------
+                      # Controllo schermata di sospensione
+                      # ------------------------------------------------
 
-                // Controlla che Streamlit non mostri ancora la schermata di sospensione.
-                if (/get this app back up/i.test(testoFinale)) {
-                  throw new Error(
-                    'L applicazione risulta ancora sospesa.'
-                  );
-                }
+                      testo_pagina = page.locator(
+                          "body"
+                      ).inner_text()
 
-              if (/get this app back up/i.test(testoFinale)) {
-                throw new Error(
-                  'L applicazione risulta ancora sospesa.'
-                );
-              }
+                      if re.search(
+                          r"get this app back up",
+                          testo_pagina,
+                          re.IGNORECASE
+                      ):
 
-              console.log('Controllo completato.');
-              console.log('Titolo pagina:', await page.title());
+                          print(
+                              "Applicazione sospesa. "
+                              "Provo a riattivarla..."
+                          )
 
-            } finally {
-              await browser.close();
-            }
-          }
+                          pulsante = page.get_by_role(
+                              "button",
+                              name=re.compile(
+                                  r"yes,\s*get this app back up",
+                                  re.IGNORECASE
+                              )
+                          )
 
-          main().catch((errore) => {
-            console.error('Errore durante il controllo:', errore);
-            process.exitCode = 1;
-          });
-          NODE
+                          if pulsante.count() > 0:
+
+                              pulsante.first.click()
+
+                              print(
+                                  "Richiesta di riattivazione inviata."
+                              )
+
+                              # Attende il caricamento dell'applicazione.
+                              page.wait_for_timeout(60000)
+
+                          else:
+
+                              raise RuntimeError(
+                                  "Schermata di sospensione rilevata, "
+                                  "ma pulsante non trovato."
+                              )
+
+                      else:
+
+                          print(
+                              "Nessuna schermata di sospensione rilevata."
+                          )
+
+                      # ------------------------------------------------
+                      # Verifica finale dello stato dell'applicazione
+                      # ------------------------------------------------
+
+                      testo_finale = page.locator(
+                          "body"
+                      ).inner_text()
+
+                      if re.search(
+                          r"get this app back up",
+                          testo_finale,
+                          re.IGNORECASE
+                      ):
+
+                          raise RuntimeError(
+                              "L'applicazione risulta ancora sospesa."
+                          )
+
+                      print("Controllo completato.")
+
+                      print(
+                          "Titolo pagina:",
+                          page.title()
+                      )
+
+                  finally:
+
+                      browser.close()
+
+          if __name__ == "__main__":
+
+              try:
+
+                  main()
+
+              except Exception as errore:
+
+                  print(
+                      "Errore durante il controllo:",
+                      errore
+                  )
+
+                  raise
+
+          PY
+
+
+  # ==========================================================
+  # JOB 2 - AVVIO METEO BOT
+  # ==========================================================
+
+  avvia-meteo-bot:
+    name: Avvia Meteo Bot
+
+    # Il bot parte soltanto dopo il controllo Keep Alive.
+    needs: keep-alive
+
+    # Richiama il workflow dedicato al Meteo Bot.
+    uses: ./.github/workflows/meteo-bot.yml
