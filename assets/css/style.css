@@ -1,0 +1,457 @@
+
+/* ============================================================
+   PROGETTO METEO
+   File: assets/css/style.css
+
+   Foglio di stile della dashboard meteorologica.
+
+   Contiene:
+   - Sfondo generale.
+   - Titoli e testi.
+   - Intestazione della dashboard.
+   - Schede informative.
+   - Grafici Plotly.
+   - Campi di ricerca e pulsanti.
+   - Tabelle.
+   - Menu laterale.
+   - Layout responsive per desktop, tablet e smartphone.
+
+   Lo sfondo della Terra viene impostato dinamicamente
+   da dashboard.py.
+   ============================================================ */
+
+
+/* ============================================================
+   IMPOSTAZIONI GENERALI
+   ============================================================ */
+
+* {
+    box-sizing: border-box;
+}
+
+.stApp {
+    background-color: #10243A;
+    color: #F1F5F9;
+}
+
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+img,
+svg,
+canvas {
+    max-width: 100%;
+}
+
+
+/* ============================================================
+   CONTENITORE PRINCIPALE
+   ============================================================ */
+
+.block-container {
+    width: 100%;
+    max-width: 1450px;
+    min-width: 0;
+    padding: 2rem 1.5rem 3rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+
+/* ============================================================
+   TITOLI E TESTI
+   ============================================================ */
+
+h1,
+h2,
+h3 {
+    color: #F1F5F9 !important;
+    letter-spacing: -0.4px;
+    overflow-wrap: anywhere;
+}
+
+p,
+label,
+.stMarkdown {
+    color: #F1F5F9;
+}
+
+p {
+    overflow-wrap: anywhere;
+}
+
+.testo-secondario {
+    color: #B8C9D9;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+
+/* ============================================================
+   INTESTAZIONE DELLA DASHBOARD
+   ============================================================ */
+
+.intestazione {
+    background: linear-gradient(
+        120deg,
+        #183650,
+        #1B4965
+    );
+    border: 1px solid #315875;
+    border-radius: 20px;
+    padding: 26px 30px;
+    margin-bottom: 24px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.titolo-dashboard {
+    color: #F1F5F9;
+    font-size: 2.2rem;
+    font-weight: 750;
+    margin-bottom: 6px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.sottotitolo-dashboard {
+    color: #B8C9D9;
+    font-size: 1rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+
+/* ============================================================
+   SCHEDE INFORMATIVE
+   ============================================================ */
+
+.scheda-meteo {
+    background: linear-gradient(
+        145deg,
+        #1B3A54,
+        #183047
+    );
+    border: 1px solid #315875;
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 135px;
+    margin-bottom: 12px;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.scheda-etichetta {
+    color: #B8C9D9;
+    font-size: 0.92rem;
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+}
+
+.scheda-valore {
+    color: #F1F5F9;
+    font-size: 2rem;
+    font-weight: 750;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.scheda-dettaglio {
+    color: #7DD3FC;
+    font-size: 0.88rem;
+    margin-top: 8px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+
+/* ============================================================
+   COLONNE STREAMLIT
+   ============================================================ */
+
+/* Consente ai contenuti delle colonne di restringersi
+   senza imporre larghezze minime indesiderate. */
+
+div[data-testid="stHorizontalBlock"] {
+    min-width: 0;
+    max-width: 100%;
+}
+
+div[data-testid="stColumn"] {
+    min-width: 0;
+}
+
+
+/* ============================================================
+   GRAFICI PLOTLY
+   ============================================================ */
+
+div[data-testid="stPlotlyChart"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    background: rgba(24, 54, 80, 0.45);
+    border: 1px solid #294861;
+    border-radius: 14px;
+    padding: 8px;
+    margin-bottom: 18px;
+    overflow: hidden;
+}
+
+/* Il contenitore del grafico non deve allargare la pagina. */
+
+div[data-testid="stPlotlyChart"] > div {
+    max-width: 100%;
+    min-width: 0;
+}
+
+
+/* ============================================================
+   CAMPI DI INSERIMENTO
+   ============================================================ */
+
+div[data-testid="stTextInput"] {
+    width: 100%;
+    min-width: 0;
+}
+
+div[data-testid="stTextInput"] input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    background-color: #183650;
+    color: #F1F5F9;
+    border: 1px solid #416581;
+    border-radius: 10px;
+}
+
+
+/* ============================================================
+   PULSANTI
+   ============================================================ */
+
+div.stButton > button,
+div.stFormSubmitButton > button {
+    max-width: 100%;
+    background: #38BDF8;
+    color: #10243A;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    padding: 0.55rem 1.2rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    transition: background-color 0.2s ease;
+}
+
+div.stButton > button:hover,
+div.stFormSubmitButton > button:hover {
+    background: #7DD3FC;
+    color: #10243A;
+    border: none;
+}
+
+
+/* ============================================================
+   SEPARATORI
+   ============================================================ */
+
+hr {
+    border-color: #31506A;
+    margin-top: 1.4rem;
+    margin-bottom: 1.4rem;
+}
+
+
+/* ============================================================
+   TABELLE
+   ============================================================ */
+
+div[data-testid="stDataFrame"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid #315875;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Le tabelle possono avere uno scorrimento interno quando
+   le colonne sono numerose, senza allargare tutta la pagina. */
+
+div[data-testid="stDataFrame"] > div {
+    max-width: 100%;
+}
+
+
+/* ============================================================
+   DIDASCALIE
+   ============================================================ */
+
+div[data-testid="stCaptionContainer"] {
+    color: #B8C9D9;
+    overflow-wrap: anywhere;
+}
+
+
+/* ============================================================
+   MENU LATERALE
+   ============================================================ */
+
+section[data-testid="stSidebar"] {
+    background: linear-gradient(
+        180deg,
+        #0B1B2D,
+        #183650
+    );
+    border-right: 1px solid #315875;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    color: #F1F5F9 !important;
+}
+
+
+/* ============================================================
+   TABLET E FINESTRE MEDIE
+   ============================================================ */
+
+@media (max-width: 992px) {
+    .block-container {
+        padding: 1.5rem 1.25rem 2rem;
+    }
+
+    .titolo-dashboard {
+        font-size: 1.9rem;
+    }
+
+    .intestazione {
+        padding: 22px;
+        border-radius: 16px;
+    }
+
+    .scheda-meteo {
+        padding: 16px;
+        min-height: 120px;
+    }
+
+    .scheda-valore {
+        font-size: 1.7rem;
+    }
+
+    div[data-testid="stPlotlyChart"] {
+        padding: 4px;
+    }
+}
+
+
+/* ============================================================
+   SMARTPHONE
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .block-container {
+        padding: 1rem 0.85rem 1.5rem;
+    }
+
+    .intestazione {
+        padding: 18px;
+        border-radius: 14px;
+        margin-bottom: 18px;
+    }
+
+    .titolo-dashboard {
+        font-size: 1.65rem;
+        letter-spacing: -0.3px;
+    }
+
+    .sottotitolo-dashboard {
+        font-size: 0.92rem;
+        line-height: 1.5;
+    }
+
+    .scheda-meteo {
+        min-height: auto;
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .scheda-etichetta {
+        font-size: 0.85rem;
+    }
+
+    .scheda-valore {
+        font-size: 1.5rem;
+    }
+
+    .scheda-dettaglio {
+        font-size: 0.82rem;
+    }
+
+    div[data-testid="stPlotlyChart"] {
+        padding: 2px;
+        border-radius: 10px;
+        margin-bottom: 14px;
+    }
+
+    div.stButton > button,
+    div.stFormSubmitButton > button {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.92rem;
+    }
+
+    div[data-testid="stDataFrame"] {
+        font-size: 0.85rem;
+    }
+
+    h1,
+    h2,
+    h3 {
+        overflow-wrap: anywhere;
+    }
+}
+
+
+/* ============================================================
+   SMARTPHONE MOLTO PICCOLI
+   ============================================================ */
+
+@media (max-width: 380px) {
+    .block-container {
+        padding-left: 0.65rem;
+        padding-right: 0.65rem;
+    }
+
+    .intestazione {
+        padding: 14px;
+    }
+
+    .titolo-dashboard {
+        font-size: 1.4rem;
+    }
+
+    .sottotitolo-dashboard {
+        font-size: 0.88rem;
+    }
+
+    .scheda-meteo {
+        padding: 12px;
+    }
+
+    .scheda-valore {
+        font-size: 1.3rem;
+    }
+
+    .scheda-dettaglio {
+        font-size: 0.78rem;
+    }
+}
