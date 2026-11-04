@@ -101,13 +101,15 @@ jobs:
                 console.log('Nessuna schermata di sospensione rilevata.');
               }
 
-              await page.waitForFunction(
-                () => document.body && document.body.innerText.trim().length > 0,
-                null,
-                { timeout: 60000 }
-              );
+              // Rilegge il contenuto della pagina dopo l'eventuale riattivazione.
+                const testoFinale = await page.locator('body').innerText();
 
-              const testoFinale = await page.locator('body').innerText();
+                // Controlla che Streamlit non mostri ancora la schermata di sospensione.
+                if (/get this app back up/i.test(testoFinale)) {
+                  throw new Error(
+                    'L applicazione risulta ancora sospesa.'
+                  );
+                }
 
               if (/get this app back up/i.test(testoFinale)) {
                 throw new Error(
