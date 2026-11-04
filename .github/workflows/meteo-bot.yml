@@ -1,0 +1,276 @@
+
+# ============================================================
+# Progetto Meteo
+# Workflow: Meteo Bot
+#
+# Simula un utente che utilizza la dashboard Meteo.
+#
+# Operazioni:
+# 1. Apre l'applicazione Streamlit.
+# 2. Inserisce il nome di una città.
+# 3. Cerca le località disponibili.
+# 4. Seleziona casualmente una località.
+# 5. Conferma la selezione.
+# 6. Mostra le previsioni meteorologiche.
+# 7. Verifica il caricamento dei dati.
+#
+# Avvio: manuale da GitHub Actions.
+# ============================================================
+
+name: Meteo Bot
+
+on:
+  workflow_dispatch:
+
+# Permessi minimi necessari.
+permissions:
+  contents: read
+
+jobs:
+
+  esegui-bot:
+
+    name: Simulazione utente Meteo
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # --------------------------------------------------------
+      # 1. Scarica il repository
+      # --------------------------------------------------------
+
+      - name: Scarica il repository
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # 2. Configura Node.js
+      # --------------------------------------------------------
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # --------------------------------------------------------
+      # 3. Installa Playwright
+      # --------------------------------------------------------
+
+      - name: Installa Playwright
+        run: npm install playwright
+
+      # --------------------------------------------------------
+      # 4. Installa Chromium
+      # --------------------------------------------------------
+
+      - name: Installa Chromium
+        run: npx playwright install --with-deps chromium
+
+      # --------------------------------------------------------
+      # 5. Avvia il bot
+      # --------------------------------------------------------
+
+      - name: Esegui il bot Meteo
+        run: node <<'NODE'
+
+          const { chromium } = require('playwright');
+
+          // Indirizzo pubblico dell'applicazione.
+          const URL_APP =
+            'https://progetto-meteo-gvm3zvz4cadns7gxmvm9hc.streamlit.app/';
+
+          async function main() {
+
+            let browser;
+
+            try {
+
+              console.log('Apro l’applicazione Meteo...');
+
+              // Avvia Chromium in modalità senza interfaccia grafica.
+              browser = await chromium.launch({
+                headless: true
+              });
+
+              const page = await browser.newPage();
+
+              // Imposta un timeout generale.
+              page.setDefaultTimeout(30000);
+
+              // Apre la dashboard.
+              await page.goto(URL_APP, {
+                waitUntil: 'domcontentloaded',
+                timeout: 90000
+              });
+
+              console.log('Pagina aperta.');
+
+              // ------------------------------------------------
+              // 1. Controlla l'eventuale schermata di sospensione
+              // ------------------------------------------------
+
+              const pulsanteRiattivazione = page.getByRole(
+                'button',
+                { name: /get this app back up/i }
+              );
+
+              if (await pulsanteRiattivazione.count() > 0) {
+
+                console.log('App sospesa: provo a riattivarla.');
+
+                await pulsanteRiattivazione.first().click();
+
+                // Attende che Streamlit completi il riavvio.
+                await page.waitForTimeout(20000);
+
+              }
+
+              // ------------------------------------------------
+              // 2. Attende il campo della città
+              // ------------------------------------------------
+
+              const campoCitta = page.getByLabel(
+                'Nome della città'
+              );
+
+              await campoCitta.waitFor({
+                state: 'visible',
+                timeout: 90000
+              });
+
+              console.log('Campo città individuato.');
+
+              // Inserisce Roma come testo di ricerca.
+              await campoCitta.fill('Roma');
+
+              // ------------------------------------------------
+              // 3. Avvia la ricerca delle località
+              // ------------------------------------------------
+
+              const pulsanteRicerca = page.getByRole(
+                'button',
+                { name: /Cerca località/ }
+              );
+
+              await pulsanteRicerca.click();
+
+              console.log('Ricerca delle località avviata.');
+
+              // Attende il menu a tendina.
+              const selettoreLocalita = page.getByRole(
+                'combobox',
+                { name: 'Seleziona la località' }
+              );
+
+              await selettoreLocalita.waitFor({
+                state: 'visible',
+                timeout: 60000
+              });
+
+              // ------------------------------------------------
+              // 4. Apre il menu e raccoglie le località
+              // ------------------------------------------------
+
+              await selettoreLocalita.click();
+
+              const opzioni = page.getByRole('option');
+
+              await opzioni.first().waitFor({
+                state: 'visible',
+                timeout: 15000
+              });
+
+              const numeroOpzioni = await opzioni.count();
+
+              if (numeroOpzioni === 0) {
+                throw new Error(
+                  'Nessuna località disponibile nel menu.'
+                );
+              }
+
+              console.log(
+                `Località disponibili: ${numeroOpzioni}`
+              );
+
+              // ------------------------------------------------
+              // 5. Sceglie casualmente una località
+              // ------------------------------------------------
+
+              const indiceCasuale = Math.floor(
+                Math.random() * numeroOpzioni
+              );
+
+              const opzioneScelta = opzioni.nth(
+                indiceCasuale
+              );
+
+              const nomeLocalita = (
+                await opzioneScelta.innerText()
+              ).trim();
+
+              console.log(
+                `Località scelta: ${nomeLocalita}`
+              );
+
+              await opzioneScelta.click();
+
+              // ------------------------------------------------
+              // 6. Conferma e mostra le previsioni
+              // ------------------------------------------------
+
+              const pulsantePrevisioni = page.getByRole(
+                'button',
+                { name: /Mostra previsioni/ }
+              );
+
+              await pulsantePrevisioni.waitFor({
+                state: 'visible',
+                timeout: 15000
+              });
+
+              await pulsantePrevisioni.click();
+
+              console.log('Richiesta delle previsioni inviata.');
+
+              // ------------------------------------------------
+              // 7. Verifica il caricamento dei dati meteorologici
+              // ------------------------------------------------
+
+              const intestazioneMeteo = page.getByRole(
+                'heading',
+                { name: /Situazione meteorologica attuale/ }
+              );
+
+              await intestazioneMeteo.waitFor({
+                state: 'visible',
+                timeout: 90000
+              });
+
+              console.log('Previsioni meteorologiche caricate.');
+
+              console.log(
+                `TEST COMPLETATO: ${nomeLocalita}`
+              );
+
+            } catch (errore) {
+
+              console.error(
+                'Errore durante il controllo:',
+                errore
+              );
+
+              throw errore;
+
+            } finally {
+
+              if (browser) {
+                await browser.close();
+              }
+
+            }
+
+          }
+
+          main();
+
+          NODE
