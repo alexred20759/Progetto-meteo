@@ -71,7 +71,7 @@ jobs:
       # --------------------------------------------------------
 
       - name: Esegui il bot Meteo
-    
+        run: |
           node <<'NODE'
 
           const { chromium } = require('playwright');
@@ -272,6 +272,9 @@ jobs:
 
           }
 
-          main();
+          main().catch((errore) => {
+            console.error('Esecuzione del bot fallita:', errore);
+            process.exitCode = 1;
+          });
 
           NODE
