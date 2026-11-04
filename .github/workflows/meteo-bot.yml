@@ -71,7 +71,8 @@ jobs:
       # --------------------------------------------------------
 
       - name: Esegui il bot Meteo
-        run: node <<'NODE'
+    
+          node <<'NODE'
 
           const { chromium } = require('playwright');
 
